@@ -2,11 +2,12 @@
 <html>
   <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>代步車登記系統</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
       body { font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #f8f9fc; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-      .card { background-color: #ffffff; width: 380px; max-width: 90%; padding: 40px; border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); text-align: center; }
+      .card { background-color: #ffffff; width: 380px; max-width: 90%; padding: 40px; border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); text-align: center; box-sizing: border-box; }
       .card h1 { font-size: 24px; color: #333; margin: 0 0 8px 0; }
       .card p { font-size: 14px; color: #666; margin: 0 0 30px 0; }
       .form-group { text-align: left; margin-bottom: 20px; }
@@ -17,6 +18,9 @@
       .btn:disabled { background-color: #a0b0ff; cursor: not-allowed; }
       #successScreen { display: none; }
       .success-icon { font-size: 60px; color: #28a745; margin-bottom: 20px; }
+      
+      /* 💡 優化 2-1：設定特定輸入框，在視覺上強制顯示為大寫 */
+      .uppercase-input { text-transform: uppercase; }
     </style>
   </head>
   <body>
@@ -28,8 +32,8 @@
           <div class="form-group"><label>登記日期</label><input type="text" id="date" readonly style="border:none; background:#e0e0e0; color:#666;"></div>
           <div class="form-group"><label>借車人姓名</label><input type="text" id="userName" required></div>
           <div class="form-group"><label>聯絡電話</label><input type="tel" id="userPhone" required></div>
-          <div class="form-group"><label>您的車牌號碼（原車）</label><input type="text" id="originalCarId" required></div>
-          <div class="form-group"><label>借出之代步車車牌</label><input type="text" id="scooterId" required></div>
+          <div class="form-group"><label>您的車牌號碼（原車）</label><input type="text" id="originalCarId" class="uppercase-input" required></div>
+          <div class="form-group"><label>借出之代步車車牌</label><input type="text" id="scooterId" class="uppercase-input" required></div>
           <button type="submit" class="btn" id="submitBtn">確認送出</button>
         </form>
       </div>
@@ -65,15 +69,14 @@
           date: document.getElementById('date').value,
           userName: document.getElementById('userName').value,
           userPhone: document.getElementById('userPhone').value,
-          originalCarId: document.getElementById('originalCarId').value,
-          scooterId: document.getElementById('scooterId').value
+          // 💡 優化 2-2：在送出資料前，用 toUpperCase() 強制把字串轉為大寫再存入試算表
+          originalCarId: document.getElementById('originalCarId').value.toUpperCase(),
+          scooterId: document.getElementById('scooterId').value.toUpperCase()
         };
 
-        // 切換到成功畫面
         document.getElementById('formScreen').style.display = 'none';
         document.getElementById('successScreen').style.display = 'block';
 
-        // 傳送資料到 GAS (使用 no-cors 暴力無視跨域阻擋)
         fetch(GAS_URL, {
           method: 'POST',
           mode: 'no-cors', 
@@ -81,7 +84,6 @@
           body: JSON.stringify(data)
         })
         .then(() => {
-          // no-cors 不會回傳文字，只要沒進 catch 就代表送出成功，開始傳 LINE 訊息
           sendLineMessageAndClose(data);
         })
         .catch(error => {
@@ -95,7 +97,7 @@
           
           liff.sendMessages([{ type: 'text', text: msg }])
             .then(() => {
-              liff.closeWindow(); // 訊息傳送成功後，瞬間關閉視窗！
+              liff.closeWindow(); 
             })
             .catch(err => {
               alert("權限錯誤：請確認是否已授權「傳送訊息至聊天室」。\n" + err.message);
