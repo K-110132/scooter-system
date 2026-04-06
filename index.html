@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>代步車登記系統</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #f8f9fc; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+      .card { background-color: #ffffff; width: 380px; max-width: 90%; padding: 40px; border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); text-align: center; }
+      .card h1 { font-size: 24px; color: #333; margin: 0 0 8px 0; }
+      .card p { font-size: 14px; color: #666; margin: 0 0 30px 0; }
+      .form-group { text-align: left; margin-bottom: 20px; }
+      .form-group label { font-size: 12px; color: #888; display: block; margin-bottom: 6px; font-weight: 500; }
+      .form-group input { width: 100%; height: 48px; padding: 12px 16px; border: 1px solid #e0e0e0; border-radius: 12px; font-size: 14px; box-sizing: border-box; }
+      .form-group input:focus { outline: none; border-color: #4a6bff; }
+      .btn { width: 100%; height: 56px; background-color: #4a6bff; color: #ffffff; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+      .btn:disabled { background-color: #a0b0ff; cursor: not-allowed; }
+      #successScreen { display: none; }
+      .success-icon { font-size: 60px; color: #28a745; margin-bottom: 20px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div id="formScreen">
+        <h1>代步車登記系統</h1>
+        <p>請確認資訊並完成登記</p>
+        <form id="registerForm">
+          <div class="form-group"><label>登記日期</label><input type="text" id="date" readonly style="border:none; background:#e0e0e0; color:#666;"></div>
+          <div class="form-group"><label>借車人姓名</label><input type="text" id="userName" required></div>
+          <div class="form-group"><label>聯絡電話</label><input type="tel" id="userPhone" required></div>
+          <div class="form-group"><label>您的車牌號碼（原車）</label><input type="text" id="originalCarId" required></div>
+          <div class="form-group"><label>借出之代步車車牌</label><input type="text" id="scooterId" required></div>
+          <button type="submit" class="btn" id="submitBtn">確認送出</button>
+        </form>
+      </div>
+
+      <div id="successScreen">
+        <div class="success-icon">✅</div>
+        <h1>處理中...</h1>
+        <p>正在同步資料並發送訊息</p>
+      </div>
+    </div>
+
+    <script>
+      // ==========================================
+      const GAS_URL = "https://script.google.com/macros/s/AKfycby2C5Jnn8_uNGh6qAre2gxtOrUAHZbGKlE8L49GE86q015HXcnAFxK8AeMyC332fdXm/exec"; 
+      const LIFF_ID = "2009698931-SZlhpxjt"; 
+      // ==========================================
+
+      window.onload = function() {
+        const today = new Date();
+        document.getElementById('date').value = today.getFullYear() + '-' + 
+          String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+        liff.init({ liffId: LIFF_ID }).catch(err => console.error("LIFF 初始化失敗", err));
+      };
+
+      document.getElementById('registerForm').addEventListener('submit', function(e) {
+        e.preventDefault(); 
+        const btn = document.getElementById('submitBtn');
+        btn.innerText = "資料傳送中...";
+        btn.style.opacity = 0.7;
+        btn.disabled = true; 
+
+        const data = {
+          date: document.getElementById('date').value,
+          userName: document.getElementById('userName').value,
+          userPhone: document.getElementById('userPhone').value,
+          originalCarId: document.getElementById('originalCarId').value,
+          scooterId: document.getElementById('scooterId').value
+        };
+
+        // 切換到成功畫面
+        document.getElementById('formScreen').style.display = 'none';
+        document.getElementById('successScreen').style.display = 'block';
+
+        // 傳送資料到 GAS (使用 no-cors 暴力無視跨域阻擋)
+        fetch(GAS_URL, {
+          method: 'POST',
+          mode: 'no-cors', 
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(data)
+        })
+        .then(() => {
+          // no-cors 不會回傳文字，只要沒進 catch 就代表送出成功，開始傳 LINE 訊息
+          sendLineMessageAndClose(data);
+        })
+        .catch(error => {
+          alert('網路連線異常，請稍後再試。');
+        });
+      });
+
+      function sendLineMessageAndClose(data) {
+        if (liff.isInClient()) {
+          const msg = `【代步車登記完成】\n📅 日期：${data.date}\n👤 姓名：${data.userName}\n📱 電話：${data.userPhone}\n🚗 原車牌：${data.originalCarId}\n🛵 代步車：${data.scooterId}\n\n謝謝您的配合，騎乘請注意安全！`;
+          
+          liff.sendMessages([{ type: 'text', text: msg }])
+            .then(() => {
+              liff.closeWindow(); // 訊息傳送成功後，瞬間關閉視窗！
+            })
+            .catch(err => {
+              alert("權限錯誤：請確認是否已授權「傳送訊息至聊天室」。\n" + err.message);
+            });
+        } else {
+          alert("登記成功！請手動關閉此網頁。");
+        }
+      }
+    </script>
+  </body>
+</html>
