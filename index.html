@@ -22,16 +22,12 @@
       #successScreen { display: none; }
       .success-icon { font-size: 60px; color: #28a745; margin-bottom: 20px; }
 
-      /* --- 新增：借用守則打勾區塊樣式 --- */
-      .rules-container { display: flex; align-items: center; margin-bottom: 20px; text-align: left; padding: 10px 0;}
-      .rules-container input[type="checkbox"] { width: 20px; height: 20px; margin: 0 10px 0 0; cursor: pointer; }
-      .rules-container label { font-size: 14px; color: #333; margin: 0; cursor: pointer; }
-      .rules-container a { color: #4a6bff; text-decoration: underline; font-weight: bold; }
-      /* 尚未閱讀時，打勾框變灰 */
-      .rules-container input[type="checkbox"]:disabled { cursor: not-allowed; opacity: 0.5; }
-      .rules-container input[type="checkbox"]:disabled + label { color: #aaa; cursor: default; }
+      /* --- 優化：建立一個絕對攔截的點擊區域 --- */
+      .rules-click-area { display: flex; align-items: center; margin-bottom: 20px; text-align: left; padding: 10px; background-color: #f1f4ff; border-radius: 12px; cursor: pointer; border: 1px solid #e0e0e0;}
+      .rules-click-area input[type="checkbox"] { width: 20px; height: 20px; margin: 0 10px 0 0; pointer-events: none; /* 讓框框本身失去感應，由外層區域全權接管 */ }
+      .rules-click-area label { font-size: 14px; color: #333; margin: 0; pointer-events: none; }
+      .fake-link { color: #4a6bff; text-decoration: underline; font-weight: bold; }
 
-      /* --- 新增：借用守則彈出視窗 (Modal) 樣式 --- */
       .modal-overlay { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
       .modal-content { background-color: #fff; width: 85%; max-width: 400px; border-radius: 20px; padding: 25px; box-sizing: border-box; display: flex; flex-direction: column; max-height: 80vh; }
       .modal-content h2 { margin-top: 0; font-size: 20px; color: #333; text-align: center; margin-bottom: 15px;}
@@ -51,9 +47,9 @@
           <div class="form-group"><label>您的車牌號碼（原車）</label><input type="text" id="originalCarId" class="uppercase-input" required></div>
           <div class="form-group"><label>借出之代步車車牌</label><input type="text" id="scooterId" class="uppercase-input" required></div>
           
-          <div class="rules-container">
-            <input type="checkbox" id="agreeRules" disabled required>
-            <label for="agreeRules">我已閱讀並同意 <a id="openRulesBtn">借用代步車規範</a></label>
+          <div class="rules-click-area" id="rulesWrapper">
+            <input type="checkbox" id="agreeRules" required>
+            <label>我已閱讀並同意 <span class="fake-link">借用代步車規範</span></label>
           </div>
 
           <button type="submit" class="btn" id="submitBtn">確認送出</button>
@@ -69,19 +65,13 @@
 
     <div id="rulesModal" class="modal-overlay">
       <div class="modal-content">
-        <h2>借用期間須遵守下列規則</h2>
+        <h2>借用代步車規範</h2>
         <div class="rules-text">
-          <p>
-            1.不得將機車轉借他人使用<br>
-            2.不得違反交通規則<br>
-            3.禁止非法使用<br>
-            <br>
-            若違反上列規定或因個人因素導致車輛損壞、失竊、交通事故、交通違規或違反民、刑法事件，
-            概由借用人負責承擔賠償責任，並放棄先訴抗辯權，如因此致牌照或車輛被扣，自被扣之日起至
-            公路監理機關領回日止，該段期間車輛借用費用由借用人負擔，借用費用依照市場行情計費。<br>
-            <br>
-            機車因事故致損壞時，由借用人負擔賠償修理費用，若失竊或失竊經尋獲後該車不勘使用時，
-            借用人須按該款車輛之市價行情負擔損壞賠償責任，不得有異。</p>
+          <p>1. 借用期間請妥善保管並愛惜車輛。<br>
+          2. 若發生交通事故或車輛損壞，借用人需負擔相關賠償責任。<br>
+          3. 借用期間產生之交通違規罰鍰，由借用人全額負擔。<br>
+          4. 請遵守交通規則，騎乘務必配戴安全帽。<br>
+          5. 本車僅提供代步使用，嚴禁轉借他人或從事違法行為。</p>
         </div>
         <button type="button" class="btn btn-agree" id="closeRulesBtn">我已瞭解並同意</button>
       </div>
@@ -89,11 +79,10 @@
 
     <script>
       // ==========================================
-      const GAS_URL = "你的_exec_網址"; 
-      const LIFF_ID = "你的_LIFF_ID"; 
+      const GAS_URL = "https://script.google.com/macros/s/AKfycby2C5Jnn8_uNGh6qAre2gxtOrUAHZbGKlE8L49GE86q015HXcnAFxK8AeMyC332fdXm/exec"; 
+      const LIFF_ID = "2009693014-gvLsG5Bj"; 
       // ==========================================
 
-      // 初始化
       window.onload = function() {
         const today = new Date();
         document.getElementById('date').value = today.getFullYear() + '-' + 
@@ -101,32 +90,31 @@
         liff.init({ liffId: LIFF_ID }).catch(err => console.error("LIFF 初始化失敗", err));
       };
 
-      // --- 新增：處理守則彈出視窗的邏輯 ---
+      // --- 絕對防護的點擊邏輯 ---
+      const rulesWrapper = document.getElementById('rulesWrapper');
       const modal = document.getElementById('rulesModal');
-      const openBtn = document.getElementById('openRulesBtn');
       const closeBtn = document.getElementById('closeRulesBtn');
       const checkbox = document.getElementById('agreeRules');
 
-      // 點擊藍字打開視窗
-      openBtn.addEventListener('click', function(e) {
-        e.preventDefault();
+      // 1. 點擊整個淺藍色框框，強制打開視窗，並確保不影響打勾狀態
+      rulesWrapper.addEventListener('click', function(e) {
+        e.preventDefault(); 
         modal.style.display = 'flex';
       });
 
-      // 點擊同意按鈕關閉視窗，並解鎖打勾
+      // 2. 點擊同意時，寫死為 true
       closeBtn.addEventListener('click', function() {
-        modal.style.display = 'none'; // 隱藏視窗
-        checkbox.disabled = false;    // 解鎖打勾框
-        checkbox.checked = true;      // 貼心地自動幫忙打勾
+        modal.style.display = 'none'; 
+        checkbox.checked = true; // 強制寫入底層狀態
       });
-      // ------------------------------------
 
       // 表單送出邏輯
       document.getElementById('registerForm').addEventListener('submit', function(e) {
         e.preventDefault(); 
         
-        // 雙重保險確認是否打勾
-        if (!checkbox.checked) {
+        // 即時抓取底層真實狀態
+        const isActuallyChecked = document.getElementById('agreeRules').checked;
+        if (!isActuallyChecked) {
           alert("請先點擊閱讀並同意借用代步車規範！");
           return;
         }
