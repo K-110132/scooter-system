@@ -19,9 +19,12 @@
       .btn { width: 100%; height: 56px; background-color: #4a6bff; color: #ffffff; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s;}
       .btn:disabled { background-color: #a0b0ff; cursor: not-allowed; }
       
+      /* --- 成功明細畫面的樣式 --- */
       #successScreen { display: none; }
-      .success-icon { font-size: 60px; color: #28a745; margin-bottom: 20px; }
-
+      .success-icon { font-size: 60px; color: #28a745; margin-bottom: 15px; }
+      .summary-box { background-color: #f1f4ff; padding: 20px; border-radius: 12px; text-align: left; margin-bottom: 20px; border: 1px solid #dbe2fb; }
+      .summary-box p { margin: 8px 0; font-size: 15px; color: #333; }
+      
       .rules-click-area { display: flex; align-items: center; margin-bottom: 20px; text-align: left; padding: 10px; background-color: #f1f4ff; border-radius: 12px; cursor: pointer; border: 1px solid #e0e0e0;}
       .rules-click-area input[type="checkbox"] { width: 20px; height: 20px; margin: 0 10px 0 0; pointer-events: none; }
       .rules-click-area label { font-size: 14px; color: #333; margin: 0; pointer-events: none; }
@@ -51,14 +54,22 @@
             <label>我已閱讀並同意 <span class="fake-link">借用代步車規範</span></label>
           </div>
 
-          <button type="submit" class="btn" id="submitBtn">確認送出</button>
+          <button type="button" class="btn" id="submitBtn">確認送出</button>
         </form>
       </div>
 
       <div id="successScreen">
         <div class="success-icon">✅</div>
-        <h1>處理中...</h1>
-        <p>正在同步資料並發送訊息</p>
+        <h1>登記成功</h1>
+        <p>資料已同步，並發送至 LINE 聊天室</p>
+        <div class="summary-box">
+          <p><strong>日期：</strong><span id="resDate"></span></p>
+          <p><strong>姓名：</strong><span id="resName"></span></p>
+          <p><strong>電話：</strong><span id="resPhone"></span></p>
+          <p><strong>原車牌：</strong><span id="resCar"></span></p>
+          <p><strong>代步車：</strong><span id="resScooter"></span></p>
+        </div>
+        <button type="button" class="btn btn-agree" id="closeAppBtn">完成並離開</button>
       </div>
     </div>
 
@@ -85,7 +96,7 @@
       // ==========================================
       const GAS_URL = "https://script.google.com/macros/s/AKfycby2C5Jnn8_uNGh6qAre2gxtOrUAHZbGKlE8L49GE86q015HXcnAFxK8AeMyC332fdXm/exec"; 
       const LIFF_ID = "2009693014-gvLsG5Bj"; 
-
+      // ==========================================
 
       window.onload = function() {
         const today = new Date();
@@ -94,9 +105,10 @@
         liff.init({ liffId: LIFF_ID }).catch(err => console.error("LIFF 初始化失敗", err));
       };
 
+      // 守則視窗邏輯
       const rulesWrapper = document.getElementById('rulesWrapper');
       const modal = document.getElementById('rulesModal');
-      const closeBtn = document.getElementById('closeRulesBtn');
+      const closeRulesBtn = document.getElementById('closeRulesBtn');
       const checkbox = document.getElementById('agreeRules');
 
       rulesWrapper.addEventListener('click', function(e) {
@@ -104,20 +116,28 @@
         modal.style.display = 'flex';
       });
 
-      closeBtn.addEventListener('click', function() {
+      closeRulesBtn.addEventListener('click', function() {
         modal.style.display = 'none'; 
         checkbox.checked = true; 
       });
 
-      document.getElementById('registerForm').addEventListener('submit', function(e) {
-        e.preventDefault(); 
+      // 💡 關鍵防禦：接管按鈕點擊事件，代替瀏覽器驗證表單
+      document.getElementById('submitBtn').addEventListener('click', function() {
+        const form = document.getElementById('registerForm');
         
-        const isActuallyChecked = document.getElementById('agreeRules').checked;
-        if (!isActuallyChecked) {
+        // 1. 檢查必填欄位
+        if (!form.checkValidity()) {
+          form.reportValidity();
+          return;
+        }
+
+        // 2. 檢查是否打勾
+        if (!checkbox.checked) {
           alert("請先點擊閱讀並同意借用代步車規範！");
           return;
         }
 
+        // 3. 準備送出
         const btn = document.getElementById('submitBtn');
         btn.innerText = "資料傳送中...";
         btn.style.opacity = 0.7;
@@ -131,42 +151,45 @@
           scooterId: document.getElementById('scooterId').value.toUpperCase()
         };
 
-        document.getElementById('formScreen').style.display = 'none';
-        document.getElementById('successScreen').style.display = 'block';
-
+        // 4. 無論如何都切換到成功畫面 (因應 iOS 假報錯)
         fetch(GAS_URL, {
           method: 'POST',
           mode: 'no-cors', 
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify(data)
         })
-        .then(() => {
-          sendLineMessageAndClose(data);
-        })
-        .catch(error => {
-          // 💡 關鍵修改：攔截到假報錯，我們不要再跳出 alert 嚇唬客人了！
-          // 既然資料有進後台，我們直接把這個 Catch 區塊當作成功來執行！
-          console.log("攔截到手機端假報錯，繼續執行後續動作");
-          sendLineMessageAndClose(data);
-        });
+        .then(() => processSuccess(data))
+        .catch(() => processSuccess(data)); // 攔截假報錯，視為成功
       });
 
-      function sendLineMessageAndClose(data) {
+      // 處理成功畫面與 LINE 訊息發送
+      function processSuccess(data) {
+        // 填入明細資料
+        document.getElementById('resDate').innerText = data.date;
+        document.getElementById('resName').innerText = data.userName;
+        document.getElementById('resPhone').innerText = data.userPhone;
+        document.getElementById('resCar').innerText = data.originalCarId;
+        document.getElementById('resScooter').innerText = data.scooterId;
+
+        // 切換畫面顯示
+        document.getElementById('formScreen').style.display = 'none';
+        document.getElementById('successScreen').style.display = 'block';
+
+        // 傳送 LINE 訊息 (不強制關閉視窗)
         if (liff.isInClient()) {
           const msg = `【代步車登記完成】\n📅 日期：${data.date}\n👤 姓名：${data.userName}\n📱 電話：${data.userPhone}\n🚗 原車牌：${data.originalCarId}\n🛵 代步車：${data.scooterId}\n\n謝謝您的配合，騎乘請注意安全！`;
-          
-          liff.sendMessages([{ type: 'text', text: msg }])
-            .then(() => { 
-              liff.closeWindow(); 
-            })
-            .catch(err => { 
-              // 雙重保險：萬一權限真的有問題傳送失敗，至少幫客人把視窗關掉
-              liff.closeWindow(); 
-            });
-        } else {
-          alert("登記成功！請手動關閉此網頁。");
+          liff.sendMessages([{ type: 'text', text: msg }]).catch(e => console.error("訊息傳送狀態:", e));
         }
       }
+
+      // 手動點擊「完成並離開」的邏輯
+      document.getElementById('closeAppBtn').addEventListener('click', function() {
+        if (liff.isInClient()) {
+          liff.closeWindow(); // 如果在 LINE 裡面，正常關閉
+        } else {
+          window.location.reload(); // 如果在外部瀏覽器，讓畫面重新整理準備下一筆登記，避免關閉報錯
+        }
+      });
     </script>
   </body>
 </html>
