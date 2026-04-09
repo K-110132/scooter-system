@@ -162,7 +162,7 @@
         .catch(() => processSuccess(data)); // 攔截假報錯，視為成功
       });
 
-      // 處理成功畫面與 LINE 訊息發送
+// 處理成功畫面與 LINE 訊息發送
       function processSuccess(data) {
         // 填入明細資料
         document.getElementById('resDate').innerText = data.date;
@@ -175,10 +175,22 @@
         document.getElementById('formScreen').style.display = 'none';
         document.getElementById('successScreen').style.display = 'block';
 
-        // 傳送 LINE 訊息 (不強制關閉視窗)
+        // 💡 顯影劑：讓系統大聲說出目前的狀態
         if (liff.isInClient()) {
           const msg = `【代步車登記完成】\n📅 日期：${data.date}\n👤 姓名：${data.userName}\n📱 電話：${data.userPhone}\n🚗 原車牌：${data.originalCarId}\n🛵 代步車：${data.scooterId}\n\n謝謝您的配合，騎乘請注意安全！`;
-          liff.sendMessages([{ type: 'text', text: msg }]).catch(e => console.error("訊息傳送狀態:", e));
+          
+          liff.sendMessages([{ type: 'text', text: msg }])
+            .then(() => {
+              // 如果成功，跳出綠色勾勾提示
+              alert("✅ 訊息成功傳送至 LINE 聊天室！");
+            })
+            .catch(e => {
+              // 如果失敗，把真正的 LINE 錯誤代碼印出來
+              alert("❌ 訊息傳送失敗！\n原因：" + e.message + "\n\n(可能原因：未開啟 chat_message.write 權限，或需要解除連動重新授權)");
+            });
+        } else {
+          // 如果根本不在 LINE 裡面
+          alert("⚠️ 系統偵測：您目前不在 LINE App 內部開啟，所以無法傳送訊息。\n請將 liff.line.me 的網址貼到 LINE 聊天室點開測試！");
         }
       }
 
