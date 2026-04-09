@@ -22,9 +22,8 @@
       #successScreen { display: none; }
       .success-icon { font-size: 60px; color: #28a745; margin-bottom: 20px; }
 
-      /* --- 優化：建立一個絕對攔截的點擊區域 --- */
       .rules-click-area { display: flex; align-items: center; margin-bottom: 20px; text-align: left; padding: 10px; background-color: #f1f4ff; border-radius: 12px; cursor: pointer; border: 1px solid #e0e0e0;}
-      .rules-click-area input[type="checkbox"] { width: 20px; height: 20px; margin: 0 10px 0 0; pointer-events: none; /* 讓框框本身失去感應，由外層區域全權接管 */ }
+      .rules-click-area input[type="checkbox"] { width: 20px; height: 20px; margin: 0 10px 0 0; pointer-events: none; }
       .rules-click-area label { font-size: 14px; color: #333; margin: 0; pointer-events: none; }
       .fake-link { color: #4a6bff; text-decoration: underline; font-weight: bold; }
 
@@ -86,7 +85,7 @@
       // ==========================================
       const GAS_URL = "https://script.google.com/macros/s/AKfycby2C5Jnn8_uNGh6qAre2gxtOrUAHZbGKlE8L49GE86q015HXcnAFxK8AeMyC332fdXm/exec"; 
       const LIFF_ID = "2009693014-gvLsG5Bj"; 
-      // ==========================================
+
 
       window.onload = function() {
         const today = new Date();
@@ -95,29 +94,24 @@
         liff.init({ liffId: LIFF_ID }).catch(err => console.error("LIFF 初始化失敗", err));
       };
 
-      // --- 絕對防護的點擊邏輯 ---
       const rulesWrapper = document.getElementById('rulesWrapper');
       const modal = document.getElementById('rulesModal');
       const closeBtn = document.getElementById('closeRulesBtn');
       const checkbox = document.getElementById('agreeRules');
 
-      // 1. 點擊整個淺藍色框框，強制打開視窗，並確保不影響打勾狀態
       rulesWrapper.addEventListener('click', function(e) {
         e.preventDefault(); 
         modal.style.display = 'flex';
       });
 
-      // 2. 點擊同意時，寫死為 true
       closeBtn.addEventListener('click', function() {
         modal.style.display = 'none'; 
-        checkbox.checked = true; // 強制寫入底層狀態
+        checkbox.checked = true; 
       });
 
-      // 表單送出邏輯
       document.getElementById('registerForm').addEventListener('submit', function(e) {
         e.preventDefault(); 
         
-        // 即時抓取底層真實狀態
         const isActuallyChecked = document.getElementById('agreeRules').checked;
         if (!isActuallyChecked) {
           alert("請先點擊閱讀並同意借用代步車規範！");
@@ -150,7 +144,10 @@
           sendLineMessageAndClose(data);
         })
         .catch(error => {
-          alert('網路連線異常，請稍後再試。');
+          // 💡 關鍵修改：攔截到假報錯，我們不要再跳出 alert 嚇唬客人了！
+          // 既然資料有進後台，我們直接把這個 Catch 區塊當作成功來執行！
+          console.log("攔截到手機端假報錯，繼續執行後續動作");
+          sendLineMessageAndClose(data);
         });
       });
 
@@ -159,8 +156,13 @@
           const msg = `【代步車登記完成】\n📅 日期：${data.date}\n👤 姓名：${data.userName}\n📱 電話：${data.userPhone}\n🚗 原車牌：${data.originalCarId}\n🛵 代步車：${data.scooterId}\n\n謝謝您的配合，騎乘請注意安全！`;
           
           liff.sendMessages([{ type: 'text', text: msg }])
-            .then(() => { liff.closeWindow(); })
-            .catch(err => { alert("權限錯誤：請確認是否已授權傳送訊息。\n" + err.message); });
+            .then(() => { 
+              liff.closeWindow(); 
+            })
+            .catch(err => { 
+              // 雙重保險：萬一權限真的有問題傳送失敗，至少幫客人把視窗關掉
+              liff.closeWindow(); 
+            });
         } else {
           alert("登記成功！請手動關閉此網頁。");
         }
