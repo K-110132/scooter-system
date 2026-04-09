@@ -9,18 +9,34 @@
       body { font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #f8f9fc; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
       .card { background-color: #ffffff; width: 380px; max-width: 90%; padding: 40px; border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); text-align: center; box-sizing: border-box; }
       .card h1 { font-size: 24px; color: #333; margin: 0 0 8px 0; }
-      .card p { font-size: 14px; color: #666; margin: 0 0 30px 0; }
+      .card p { font-size: 14px; color: #666; margin: 0 0 25px 0; }
       .form-group { text-align: left; margin-bottom: 20px; }
       .form-group label { font-size: 12px; color: #888; display: block; margin-bottom: 6px; font-weight: 500; }
       .form-group input { width: 100%; height: 48px; padding: 12px 16px; border: 1px solid #e0e0e0; border-radius: 12px; font-size: 14px; box-sizing: border-box; }
       .form-group input:focus { outline: none; border-color: #4a6bff; }
-      .btn { width: 100%; height: 56px; background-color: #4a6bff; color: #ffffff; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+      .uppercase-input { text-transform: uppercase; }
+      
+      .btn { width: 100%; height: 56px; background-color: #4a6bff; color: #ffffff; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s;}
       .btn:disabled { background-color: #a0b0ff; cursor: not-allowed; }
+      
       #successScreen { display: none; }
       .success-icon { font-size: 60px; color: #28a745; margin-bottom: 20px; }
-      
-      /* 💡 優化 2-1：設定特定輸入框，在視覺上強制顯示為大寫 */
-      .uppercase-input { text-transform: uppercase; }
+
+      /* --- 新增：借用守則打勾區塊樣式 --- */
+      .rules-container { display: flex; align-items: center; margin-bottom: 20px; text-align: left; padding: 10px 0;}
+      .rules-container input[type="checkbox"] { width: 20px; height: 20px; margin: 0 10px 0 0; cursor: pointer; }
+      .rules-container label { font-size: 14px; color: #333; margin: 0; cursor: pointer; }
+      .rules-container a { color: #4a6bff; text-decoration: underline; font-weight: bold; }
+      /* 尚未閱讀時，打勾框變灰 */
+      .rules-container input[type="checkbox"]:disabled { cursor: not-allowed; opacity: 0.5; }
+      .rules-container input[type="checkbox"]:disabled + label { color: #aaa; cursor: default; }
+
+      /* --- 新增：借用守則彈出視窗 (Modal) 樣式 --- */
+      .modal-overlay { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
+      .modal-content { background-color: #fff; width: 85%; max-width: 400px; border-radius: 20px; padding: 25px; box-sizing: border-box; display: flex; flex-direction: column; max-height: 80vh; }
+      .modal-content h2 { margin-top: 0; font-size: 20px; color: #333; text-align: center; margin-bottom: 15px;}
+      .rules-text { overflow-y: auto; text-align: left; font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 20px; flex-grow: 1; padding-right: 5px;}
+      .btn-agree { background-color: #28a745; }
     </style>
   </head>
   <body>
@@ -34,6 +50,12 @@
           <div class="form-group"><label>聯絡電話</label><input type="tel" id="userPhone" required></div>
           <div class="form-group"><label>您的車牌號碼（原車）</label><input type="text" id="originalCarId" class="uppercase-input" required></div>
           <div class="form-group"><label>借出之代步車車牌</label><input type="text" id="scooterId" class="uppercase-input" required></div>
+          
+          <div class="rules-container">
+            <input type="checkbox" id="agreeRules" disabled required>
+            <label for="agreeRules">我已閱讀並同意 <a id="openRulesBtn">借用代步車規範</a></label>
+          </div>
+
           <button type="submit" class="btn" id="submitBtn">確認送出</button>
         </form>
       </div>
@@ -45,12 +67,33 @@
       </div>
     </div>
 
+    <div id="rulesModal" class="modal-overlay">
+      <div class="modal-content">
+        <h2>借用期間須遵守下列規則</h2>
+        <div class="rules-text">
+          <p>
+            1.不得將機車轉借他人使用<br>
+            2.不得違反交通規則<br>
+            3.禁止非法使用<br>
+            <br>
+            若違反上列規定或因個人因素導致車輛損壞、失竊、交通事故、交通違規或違反民、刑法事件，
+            概由借用人負責承擔賠償責任，並放棄先訴抗辯權，如因此致牌照或車輛被扣，自被扣之日起至
+            公路監理機關領回日止，該段期間車輛借用費用由借用人負擔，借用費用依照市場行情計費。<br>
+            <br>
+            機車因事故致損壞時，由借用人負擔賠償修理費用，若失竊或失竊經尋獲後該車不勘使用時，
+            借用人須按該款車輛之市價行情負擔損壞賠償責任，不得有異。</p>
+        </div>
+        <button type="button" class="btn btn-agree" id="closeRulesBtn">我已瞭解並同意</button>
+      </div>
+    </div>
+
     <script>
       // ==========================================
-      const GAS_URL = "https://script.google.com/macros/s/AKfycby2C5Jnn8_uNGh6qAre2gxtOrUAHZbGKlE8L49GE86q015HXcnAFxK8AeMyC332fdXm/exec"; 
-      const LIFF_ID = "2009698931-SZlhpxjt"; 
+      const GAS_URL = "你的_exec_網址"; 
+      const LIFF_ID = "你的_LIFF_ID"; 
       // ==========================================
 
+      // 初始化
       window.onload = function() {
         const today = new Date();
         document.getElementById('date').value = today.getFullYear() + '-' + 
@@ -58,8 +101,36 @@
         liff.init({ liffId: LIFF_ID }).catch(err => console.error("LIFF 初始化失敗", err));
       };
 
+      // --- 新增：處理守則彈出視窗的邏輯 ---
+      const modal = document.getElementById('rulesModal');
+      const openBtn = document.getElementById('openRulesBtn');
+      const closeBtn = document.getElementById('closeRulesBtn');
+      const checkbox = document.getElementById('agreeRules');
+
+      // 點擊藍字打開視窗
+      openBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        modal.style.display = 'flex';
+      });
+
+      // 點擊同意按鈕關閉視窗，並解鎖打勾
+      closeBtn.addEventListener('click', function() {
+        modal.style.display = 'none'; // 隱藏視窗
+        checkbox.disabled = false;    // 解鎖打勾框
+        checkbox.checked = true;      // 貼心地自動幫忙打勾
+      });
+      // ------------------------------------
+
+      // 表單送出邏輯
       document.getElementById('registerForm').addEventListener('submit', function(e) {
         e.preventDefault(); 
+        
+        // 雙重保險確認是否打勾
+        if (!checkbox.checked) {
+          alert("請先點擊閱讀並同意借用代步車規範！");
+          return;
+        }
+
         const btn = document.getElementById('submitBtn');
         btn.innerText = "資料傳送中...";
         btn.style.opacity = 0.7;
@@ -69,7 +140,6 @@
           date: document.getElementById('date').value,
           userName: document.getElementById('userName').value,
           userPhone: document.getElementById('userPhone').value,
-          // 💡 優化 2-2：在送出資料前，用 toUpperCase() 強制把字串轉為大寫再存入試算表
           originalCarId: document.getElementById('originalCarId').value.toUpperCase(),
           scooterId: document.getElementById('scooterId').value.toUpperCase()
         };
@@ -96,12 +166,8 @@
           const msg = `【代步車登記完成】\n📅 日期：${data.date}\n👤 姓名：${data.userName}\n📱 電話：${data.userPhone}\n🚗 原車牌：${data.originalCarId}\n🛵 代步車：${data.scooterId}\n\n謝謝您的配合，騎乘請注意安全！`;
           
           liff.sendMessages([{ type: 'text', text: msg }])
-            .then(() => {
-              liff.closeWindow(); 
-            })
-            .catch(err => {
-              alert("權限錯誤：請確認是否已授權「傳送訊息至聊天室」。\n" + err.message);
-            });
+            .then(() => { liff.closeWindow(); })
+            .catch(err => { alert("權限錯誤：請確認是否已授權傳送訊息。\n" + err.message); });
         } else {
           alert("登記成功！請手動關閉此網頁。");
         }
